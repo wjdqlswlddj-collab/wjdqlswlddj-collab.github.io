@@ -3,8 +3,37 @@ const T={"ALG":["알제리","Algeria","J",78,"dz",[["MAHREZ","FW",83],["AIT NOUR
 let view='tour',historyTour=null,selectedTeam=C[0],selectedTarget=0,amount=0,busy=false,bracketRound=0,pendingBetResults=[];
 function freshTeam(){return{gw:0,r32:0,r16:0,qf:0,sf:0,fin:0,win:0,pts:0,gf:0,ga:0}}
 function fresh(){let teams={};C.forEach(c=>teams[c]=freshTeam());return{total:0,last:0,teams:teams,archives:[],wallet:{bal:100000,betN:0,hit:0,miss:0,fee:0,profit:0,log:[],recoveryTry:0,recoveryHit:0},active:null}}
-function normalize(x){if(!x||!x.teams||!x.wallet)return fresh();C.forEach(c=>{if(!x.teams[c])x.teams[c]=freshTeam();else Object.assign(x.teams[c],freshTeam(),x.teams[c])});x.total=+x.total||0;x.last=+x.last||0;x.archives=Array.isArray(x.archives)?x.archives:[];x.wallet=Object.assign(fresh().wallet,x.wallet||{});x.wallet.log=Array.isArray(x.wallet.log)?x.wallet.log:[];if(x.active){x.active.bets=Array.isArray(x.active.bets)?x.active.bets:[];x.active.reveal=Number.isInteger(x.active.reveal)?x.active.reveal:-1;x.active.locked=x.active.locked||null;x.active.committed=!!x.active.committed}return x}
-function load(){try{let x=JSON.parse(localStorage.getItem(KEY));return normalize(x)}catch(e){}return fresh()}
+function reviveTournament(t){
+  if(!t||!Array.isArray(t.rounds))return null;
+  t.gm=Array.isArray(t.gm)?t.gm:[];
+  t.thirds=Array.isArray(t.thirds)?t.thirds:[];
+  t.tabs=t.tabs&&typeof t.tabs==='object'?t.tabs:{};
+  let reach={r32:new Set(),r16:new Set(),qf:new Set(),sf:new Set(),fin:new Set(),win:new Set()};
+  (t.rounds[0]||[]).forEach(m=>{if(!m)return;if(m.a)reach.r32.add(m.a);if(m.b)reach.r32.add(m.b);if(m.w)reach.r16.add(m.w)});
+  (t.rounds[1]||[]).forEach(m=>{if(m&&m.w)reach.qf.add(m.w)});
+  (t.rounds[2]||[]).forEach(m=>{if(m&&m.w)reach.sf.add(m.w)});
+  (t.rounds[3]||[]).forEach(m=>{if(m&&m.w)reach.fin.add(m.w)});
+  let final=(t.rounds[4]||[])[0];
+  if(t.champ)reach.win.add(t.champ);else if(final&&final.w){t.champ=final.w;reach.win.add(final.w)}
+  if(!t.runner&&final&&final.w)t.runner=final.a===final.w?final.b:final.a;
+  t.reach=reach;
+  return t
+}
+function normalize(x){
+  if(!x||!x.teams||!x.wallet)return fresh();
+  C.forEach(c=>{if(!x.teams[c])x.teams[c]=freshTeam();else x.teams[c]=Object.assign(freshTeam(),x.teams[c])});
+  x.total=+x.total||0;x.last=+x.last||0;x.archives=Array.isArray(x.archives)?x.archives:[];
+  x.wallet=Object.assign(fresh().wallet,x.wallet||{});x.wallet.log=Array.isArray(x.wallet.log)?x.wallet.log:[];
+  if(x.active){
+    x.active.bets=Array.isArray(x.active.bets)?x.active.bets:[];
+    x.active.reveal=Number.isInteger(x.active.reveal)?x.active.reveal:-1;
+    x.active.locked=x.active.locked||null;x.active.committed=!!x.active.committed;
+    x.active.t=reviveTournament(x.active.t);
+    if(!x.active.t)x.active=null
+  }
+  return x
+}
+function load(){try{let raw=localStorage.getItem(KEY);if(!raw)return fresh();return normalize(JSON.parse(raw))}catch(e){try{localStorage.removeItem(KEY)}catch(_){}return fresh()}}
 let S=load();function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function esc(x){return String(x).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function flag(c){let iso=T[c][4];return iso?'<img class="flag" src="https://flagcdn.com/w40/'+iso+'.png" alt="'+c+'" onerror="this.outerHTML=\'<b>'+c+'</b>\'">':'<b>'+c+'</b>'}
